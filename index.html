@@ -402,8 +402,8 @@
             const r = await msal.acquireTokenSilent(req);
             return r.idToken;
         } catch {
-            const r = await msal.acquireTokenPopup(req);
-            return r.idToken;
+            await msal.acquireTokenRedirect(req);
+            return null; // page will redirect and come back
         }
     }
 
@@ -451,10 +451,7 @@
         }
         if (!msal) initMsal();
         try {
-            const r = await msal.loginPopup({ scopes: ['openid', 'profile', 'email'] });
-            account = r.account;
-            msal.setActiveAccount(account);
-            await onSignedIn();
+            await msal.loginRedirect({ scopes: ['openid', 'profile', 'email'] });
         } catch (e) {
             showToast('Sign-in failed', e.message, 'error');
         }
@@ -905,11 +902,18 @@
         }
         initMsal();
         try {
-            const accs = msal.getAllAccounts();
-            if (accs.length) {
-                account = accs[0];
+            const redirectResult = await msal.handleRedirectPromise();
+            if (redirectResult && redirectResult.account) {
+                account = redirectResult.account;
                 msal.setActiveAccount(account);
                 await onSignedIn();
+            } else {
+                const accs = msal.getAllAccounts();
+                if (accs.length) {
+                    account = accs[0];
+                    msal.setActiveAccount(account);
+                    await onSignedIn();
+                }
             }
         } catch (e) { console.error(e); }
         renderFollowupList();
